@@ -80,3 +80,4 @@ if st.button("Сгенерировать рабочий лист"):
             except Exception as e:
                 st.error(f"Ошибка при генерации: {e}")
 
+openai.api_key = "твой_ключ_от_OpenAI"
