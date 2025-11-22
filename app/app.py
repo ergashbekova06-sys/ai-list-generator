@@ -1,0 +1,44 @@
+import streamlit as st
+import openai
+import pandas as pd
+
+# Настройка ключа OpenAI
+openai.api_key = st.secrets["OPENAI_API_KEY"]
+
+st.set_page_config(page_title="AI Генератор рабочих листов", layout="wide")
+st.title("🤖 AI Генератор рабочих листов для учителей")
+
+# --- Секция ввода ---
+st.sidebar.header("Настройки генерации")
+subject = st.sidebar.selectbox("Выберите предмет", ["Физика", "Математика", "Биология", "Химия", "История"])
+grade = st.sidebar.selectbox("Класс", list(range(1, 12)))
+difficulty = st.sidebar.selectbox("Уровень сложности", ["Легкий", "Средний", "Сложный"])
+num_tasks = st.sidebar.slider("Количество заданий", min_value=1, max_value=20, value=5)
+
+prompt = st.text_area("Введите тему или ключевые слова для заданий:", "")
+
+# --- Генерация заданий ---
+if st.button("Сгенерировать рабочий лист"):
+    if prompt.strip() == "":
+        st.warning("Пожалуйста, введите тему или ключевые слова!")
+    else:
+        with st.spinner("Генерируем задания..."):
+            response = openai.ChatCompletion.create(
+                model="gpt-4",
+                messages=[
+                    {"role": "system", "content": "Ты помощник учителя, создающий готовые задания, тесты и упражнения."},
+                    {"role": "user", "content": f"Создай {num_tasks} заданий по предмету {subject}, для {grade} класса, уровень сложности {difficulty}, по теме: {prompt}. Представь их в виде таблицы с колонками: '№', 'Задание', 'Тип' (тест/упражнение/задача)."}
+                ],
+                temperature=0.7,
+                max_tokens=1200
+            )
+            tasks_text = response['choices'][0]['message']['content']
+
+            # Попытка превратить текст в таблицу
+            try:
+                df = pd.read_csv(pd.compat.StringIO(tasks_text), sep="|")
+                st.dataframe(df)
+            except:
+                st.text(tasks_text)
+
+        st.success("Готово! Вы можете скопировать задания или сохранить их в PDF/Excel.")
