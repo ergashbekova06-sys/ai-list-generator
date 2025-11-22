@@ -3,9 +3,9 @@ import openai
 import pandas as pd
 from fpdf import FPDF
 import os
+from io import BytesIO
 
 # --- Настройка API ключа ---
-# Вставьте сюда свой ключ OpenAI или используйте переменную окружения
 openai.api_key = os.getenv("OPENAI_API_KEY") or "вставьте_сюда_свой_ключ"
 
 st.set_page_config(page_title="AI Генератор рабочих листов", layout="wide")
@@ -17,7 +17,6 @@ subject = st.sidebar.selectbox("Выберите предмет", ["Физика
 grade = st.sidebar.selectbox("Класс", list(range(1, 12)))
 difficulty = st.sidebar.selectbox("Уровень сложности", ["Легкий", "Средний", "Сложный"])
 num_tasks = st.sidebar.slider("Количество заданий", min_value=1, max_value=20, value=5)
-
 prompt = st.text_area("Введите тему или ключевые слова для заданий:", "")
 
 # --- Генерация заданий ---
@@ -38,34 +37,42 @@ if st.button("Сгенерировать рабочий лист"):
                 )
                 tasks_text = response.choices[0].message.content
 
-                # Попробуем преобразовать в DataFrame (если ИИ вернул таблицу)
+                # Попробуем создать DataFrame
                 try:
                     from io import StringIO
                     df = pd.read_csv(StringIO(tasks_text), sep="|")
-                    st.dataframe(df)
                 except:
-                    st.text(tasks_text)
-                    # Создадим DataFrame вручную для PDF
-                    df = pd.DataFrame([x.strip().split('.') for x in tasks_text.split('\n') if x.strip() != ""],
-                                      columns=["№", "Задание", "Тип"])
+                    # Если ИИ вернул обычный текст, разделяем по строкам
+                    lines = [line.strip() for line in tasks_text.split("\n") if line.strip() != ""]
+                    data = []
+                    for idx, line in enumerate(lines, 1):
+                        data.append([idx, line, "Задача"])
+                    df = pd.DataFrame(data, columns=["№", "Задание", "Тип"])
+
+                st.dataframe(df)
 
                 # --- Кнопка для скачивания PDF ---
-                if st.button("Скачать PDF"):
-                    pdf = FPDF()
-                    pdf.add_page()
-                    pdf.set_font("Arial", size=12)
-                    pdf.cell(0, 10, f"Рабочий лист по предмету {subject}, {grade} класс", ln=True)
-                    pdf.ln(5)
+                pdf = FPDF()
+                pdf.add_page()
+                pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
+                pdf.set_font("DejaVu", "", 12)
+                pdf.cell(0, 10, f"Рабочий лист по предмету {subject}, {grade} класс", ln=True)
+                pdf.ln(5)
 
-                    # Добавляем задания
-                    for i, row in df.iterrows():
-                        pdf.multi_cell(0, 8, f"{row['№']}. {row['Задание']} ({row['Тип']})")
-                        pdf.ln(1)
+                for i, row in df.iterrows():
+                    pdf.multi_cell(0, 8, f"{row['№']}. {row['Задание']} ({row['Тип']})")
+                    pdf.ln(1)
 
-                    pdf_file = "worksheet.pdf"
-                    pdf.output(pdf_file)
-                    with open(pdf_file, "rb") as f:
-                        st.download_button("Скачать PDF", f, file_name=pdf_file, mime="application/pdf")
+                pdf_buffer = BytesIO()
+                pdf.output(pdf_buffer)
+                pdf_buffer.seek(0)
+
+                st.download_button(
+                    label="📥 Скачать PDF",
+                    data=pdf_buffer,
+                    file_name=f"worksheet_{subject}_{grade}kl.pdf",
+                    mime="application/pdf"
+                )
 
             except Exception as e:
                 st.error(f"Ошибка при генерации: {e}")
