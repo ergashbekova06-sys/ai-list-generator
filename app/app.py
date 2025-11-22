@@ -2,8 +2,8 @@ import streamlit as st
 import openai
 import pandas as pd
 from fpdf import FPDF
-import os
 from io import BytesIO
+import os
 
 # --- Настройка API ключа ---
 openai.api_key = os.getenv("OPENAI_API_KEY") or "вставьте_сюда_свой_ключ"
@@ -26,6 +26,7 @@ if st.button("Сгенерировать рабочий лист"):
     else:
         with st.spinner("Генерируем задания..."):
             try:
+                # --- Запрос к OpenAI ---
                 response = openai.chat.completions.create(
                     model="gpt-4",
                     messages=[
@@ -37,12 +38,11 @@ if st.button("Сгенерировать рабочий лист"):
                 )
                 tasks_text = response.choices[0].message.content
 
-                # Попробуем создать DataFrame
+                # --- Попытка создать DataFrame ---
                 try:
                     from io import StringIO
                     df = pd.read_csv(StringIO(tasks_text), sep="|")
                 except:
-                    # Если ИИ вернул обычный текст, разделяем по строкам
                     lines = [line.strip() for line in tasks_text.split("\n") if line.strip() != ""]
                     data = []
                     for idx, line in enumerate(lines, 1):
@@ -51,7 +51,7 @@ if st.button("Сгенерировать рабочий лист"):
 
                 st.dataframe(df)
 
-                # --- Кнопка для скачивания PDF ---
+                # --- Генерация PDF ---
                 pdf = FPDF()
                 pdf.add_page()
                 pdf.add_font("DejaVu", "", "DejaVuSans.ttf", uni=True)
@@ -63,10 +63,13 @@ if st.button("Сгенерировать рабочий лист"):
                     pdf.multi_cell(0, 8, f"{row['№']}. {row['Задание']} ({row['Тип']})")
                     pdf.ln(1)
 
+                # Сохраняем PDF в байтовый буфер
                 pdf_buffer = BytesIO()
-                pdf.output(pdf_buffer)
+                pdf_output = pdf.output(dest='S').encode('latin1')  # dest='S' -> сохранить в строку
+                pdf_buffer.write(pdf_output)
                 pdf_buffer.seek(0)
 
+                # --- Кнопка для скачивания PDF ---
                 st.download_button(
                     label="📥 Скачать PDF",
                     data=pdf_buffer,
