@@ -69,10 +69,9 @@ if st.button("Сгенерировать рабочий лист"):
                     pdf.multi_cell(0, 8, f"{row['№']}. {row['Задание']} ({row['Тип']})")
                     pdf.ln(1)
 
-                # Сохраняем PDF в буфер для Streamlit
+                # Сохраняем PDF в байтовый буфер
                 pdf_buffer = BytesIO()
-                pdf_output = pdf.output(dest='S').encode('latin1')
-                pdf_buffer.write(pdf_output)
+                pdf.output(pdf_buffer)  # Важное изменение: без .encode()
                 pdf_buffer.seek(0)
 
                 # Кнопка для скачивания PDF
@@ -85,3 +84,4 @@ if st.button("Сгенерировать рабочий лист"):
 
             except Exception as e:
                 st.error(f"Ошибка при генерации: {e}")
+
